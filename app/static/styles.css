@@ -66,7 +66,6 @@ button.passage-label.ai-label.armed{outline-color:var(--rust)}
 .operation-status{font-size:13px;line-height:1.5;margin:10px 0 0;max-width:520px;color:#245c4e}
 .operation-status:empty{display:none}
 .operation-status.error{color:#a22d25}
-.export-help{font-size:13px;line-height:1.5;margin:10px 0 0;color:#6a5d40}
 .storage-details{margin-top:18px;border-top:1px solid #ddd;padding-top:12px}
 .storage-details p{margin-top:10px}
 button:disabled{cursor:not-allowed}
@@ -74,18 +73,32 @@ button.retry-saving{font-size:12px;padding:5px 9px}
 button.retry-saving[hidden]{display:none}
 
 /* Always available submission/download controls, with measured clearance. */
-:root{--action-dock-height:180px}
+:root{--action-dock-height:60px}
 body.annotating main{padding-bottom:calc(var(--action-dock-height) + 32px)}
 .annotating .annotation-side{max-height:calc(100dvh - var(--action-dock-height) - 36px);scroll-padding-bottom:20px}
 .annotating .question{scroll-margin-block:20px}
-.action-dock{position:fixed;inset:auto 0 0;z-index:20;background:#fff;border-top:1px solid #cbd6ce;box-shadow:0 -3px 14px #192f3510;max-height:45dvh;overflow:auto;padding:12px 5vw calc(12px + env(safe-area-inset-bottom))}
+.action-dock{position:fixed;inset:auto 0 0;z-index:20;background:#fff;border-top:1px solid #cbd6ce;box-shadow:0 -3px 14px #192f3510;max-height:45dvh;overflow:auto;padding:8px 5vw calc(8px + env(safe-area-inset-bottom))}
 .action-dock-inner{max-width:1350px;margin:auto}
 .dock-main{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 .dock-status{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;min-width:0}
-.dock-status .tag{white-space:normal}
-.dock-description{font-size:12px;color:var(--muted);margin:7px 0 0;line-height:1.5}
-.action-dock .operation-status,.action-dock .export-help{max-width:none;margin-top:5px}
-.export-help:empty{display:none}
+.action-dock .operation-status{max-width:none;margin-top:5px}
 .annotating #notice{display:none}
 @media(max-width:900px){.annotating .annotation-side{max-height:none}}
-@media(max-width:540px){:root{--action-dock-height:240px}.action-dock{padding-left:4vw;padding-right:4vw}.dock-main{gap:8px}.dock-main .button-bar{width:100%;gap:6px}.dock-main button{padding:8px 10px;font-size:12px;flex:1}.dock-description{font-size:11px}}
+@media(max-width:540px){:root{--action-dock-height:160px}.action-dock{padding-left:4vw;padding-right:4vw}.dock-main{gap:8px}.dock-main .button-bar{width:100%;gap:6px}.dock-main button{padding:8px 10px;font-size:12px;flex:1}}
+
+.dock-status{font-size:12px;color:var(--muted)}
+.dock-status.error{color:#a22d25}
+.action-dock .button-bar button{padding:8px 12px}
+
+.visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+.download-control{display:inline-flex}
+@media(max-width:540px){.download-control{flex:1}.download-control button{width:100%}}
+
+/* All action feedback shares the same line as the normal status. */
+.dock-main{flex-wrap:nowrap}
+.dock-status{display:block;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dock-main .button-bar{flex-shrink:0}
+@media(max-width:540px){.dock-main{flex-wrap:wrap}.dock-status{flex-basis:100%}}
+
+@media(max-width:900px){.dock-main{flex-wrap:wrap}.dock-status{flex-basis:100%}}
+@media(max-width:540px){.dock-main .button-bar>button,.dock-main .button-bar>.download-control{flex:1;min-width:0}.dock-main .button-bar button{padding:8px;overflow-wrap:anywhere}}

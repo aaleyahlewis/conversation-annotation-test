@@ -2,13 +2,17 @@
 let boot, current=null, preview=null, selected=null, label=null;
 let regionsOpen=false, savedDocument=null, fieldSaveError=null, submitting=false;
 let validationIssues=[],submitError='',actionBarObserver=null;
+let dockMessage='',dockError=false,dockTimer=null;
 let generation=0, savedGeneration=0, saving=null, timer=null;
 const app=document.querySelector('#app'), notice=document.querySelector('#notice');
 const cp=s=>Array.from(s);
 function replaceApp(...nodes){actionBarObserver?.disconnect();app.replaceChildren(...nodes.filter(x=>x!==null&&x!==undefined));}
 function el(tag,attrs={},...children){const n=document.createElement(tag);for(const [k,v] of Object.entries(attrs)){if(k.startsWith('on'))n.addEventListener(k.slice(2),v);else if(k==='class')n.className=v;else if(k==='text')n.textContent=v;else if(k==='checked')n.checked=v;else if(k==='value')n.dataset.initialValue=v;else if(v!==undefined&&v!==null)n.setAttribute(k,v);}for(const c of children.flat())if(c!==null&&c!==undefined)n.append(c instanceof Node?c:document.createTextNode(String(c)));if(Object.hasOwn(attrs,'value'))n.value=attrs.value;return n;}
 const button=(text,fn,cls='')=>el('button',{type:'button',class:cls,onclick:fn},text);
-function tell(text,error=false){const local=current&&document.querySelector('#editor-feedback');if(local){notice.textContent='';localStatus(local,text,error);return;}notice.textContent=text;notice.className=error?'error':'';}
+function tell(text,error=false){if(current&&document.querySelector('#submission-status')){notice.textContent='';dockFeedback(text,error);return;}notice.textContent=text;notice.className=error?'error':'';}
+function clearDockFeedback(){clearTimeout(dockTimer);dockMessage='';dockError=false;}
+function dockFeedback(text,error=false){clearDockFeedback();dockMessage=text;dockError=error;refreshDockStatus();if(text&&!error&&!text.startsWith('Preparing'))dockTimer=setTimeout(()=>{dockMessage='';refreshDockStatus();},5000);}
+function refreshDockStatus(){const n=document.querySelector('#submission-status');if(!n)return;const message=fieldSaveError?'Save failed — '+fieldSaveError:submitError||dockMessage||editorStatus();n.textContent=message;n.setAttribute('title',message);n.classList.toggle('error',!!fieldSaveError||!!submitError||dockError);}
 function labelHint(text){const n=document.querySelector('#label-status');if(n)n.textContent=text;}
 async function api(path,body){const r=await fetch(path,{method:body===undefined?'GET':'POST',headers:body===undefined?{}:{'Content-Type':'application/json','X-Annotation-CSRF':boot.csrf},body:body===undefined?undefined:JSON.stringify(body)});const data=await r.json();if(!r.ok){const error=new Error(data.error||'Request failed');error.issues=data.issues;throw error;}return data;}
 async function busy(b,fn){if(b.disabled)return;b.disabled=true;try{await fn();}catch(e){tell(e.message,true);}finally{b.disabled=false;}}
@@ -16,13 +20,17 @@ function action(text,fn,cls=''){let b=button(text,()=>busy(b,fn),cls);return b;}
 function steps(active){return el('nav',{class:'steps','aria-label':'Import progress'},...['Import','Review','Annotate'].map((s,i)=>el('span',{class:i===active?'active':''},`${String(i+1).padStart(2,'0')}  ${s}`)));}
 function localStatus(node,message,error=false){if(!node)return;node.textContent=message;node.classList.toggle('error',error);}
 async function download(path,feedback=null){
+ const inEditor=!!current&&path.startsWith('/api/conversations/');
+ const conversationId=inEditor?current.id:null;
+ const report=(message,error=false)=>{if(inEditor){if(current?.id===conversationId)dockFeedback(message,error);}else localStatus(feedback,message,error);};
+ if(inEditor)submitError='';
  try{
-  localStatus(feedback,'Preparing download…');await flush();
+  report('Preparing download…');await flush();
   const r=await fetch(path);if(!r.ok){const e=await r.json();throw new Error(e.error||'Download failed.');}
   const blob=await r.blob(),url=URL.createObjectURL(blob),a=el('a',{href:url,download:path.endsWith('.zip')?'annotation-data.zip':path.endsWith('/current.json')?'current-annotations.json':'annotations.json'});
   document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
-  localStatus(feedback,path.endsWith('.zip')?'Research ZIP downloaded. It contains the latest submitted annotations.':'JSON downloaded. It contains the current saved conversation and annotations, labelled as draft or submitted.');
- }catch(e){localStatus(feedback,e.message,true);if(!feedback)tell(e.message,true);}
+  report(path.endsWith('.zip')?'Research ZIP downloaded.':'JSON downloaded.');
+ }catch(e){report(e.message,true);if(!inEditor&&!feedback)tell(e.message,true);}
 }
 async function goHome(){await flush();tell('');current=null;selected=null;history.replaceState(null,'','#home');await home();}
 async function home(){document.body.classList.remove('annotating');replaceApp(el('p',{class:'loading'},'Loading conversations…'));const rows=await api('/api/conversations');
@@ -45,12 +53,17 @@ async function home(){document.body.classList.remove('annotating');replaceApp(el
 async function loadPreview(body){preview=await api('/api/preview',body);current=null;history.replaceState(null,'','#review');renderPreview();tell('Review every message before confirming. You can exclude messages or edit sensitive details.');}
 function renderPreview(){document.body.classList.remove('annotating');const d=preview.data;const title=el('input',{type:'text',value:d.title,'aria-label':'Conversation title'});const inputs=[];const content=el('div',{});
  d.dialogue.forEach((m,i)=>{const check=el('input',{type:'checkbox',checked:true,'aria-label':`Include message ${i+1}`});const text=el('textarea',{value:m.text,'aria-label':`Message ${i+1}, ${m.author}`});const card=el('article',{class:'card review-message'},el('label',{},check,`${m.author} · Message ${i+1}`),text);check.addEventListener('change',()=>{card.classList.toggle('excluded',!check.checked);text.disabled=!check.checked;});inputs.push({check,text,m});content.append(card);});
- const confirm=action('Confirm & start annotation →',async()=>{const messages=inputs.filter(x=>x.check.checked).map(x=>({message_id:x.m.message_id,text:x.text.value}));if(!messages.length)throw Error('Include at least one message.');tell('Saving your confirmed conversation and creating its Label Studio task…');const r=await api('/api/confirm',{preview_id:preview.preview_id,title:title.value,messages});preview=null;await openConversation(r.id);tell(r.sync_error?'Conversation saved locally. '+r.sync_error:'Conversation confirmed. Highlight a passage to begin.',!!r.sync_error);});
+ const confirm=action('Confirm & start annotation →',async()=>{const messages=inputs.filter(x=>x.check.checked).map(x=>({message_id:x.m.message_id,text:x.text.value}));if(!messages.length)throw Error('Include at least one message.');tell('Saving your confirmed conversation and creating its Label Studio task…');const r=await api('/api/confirm',{preview_id:preview.preview_id,title:title.value,messages});preview=null;await openConversation(r.id);tell(r.sync_error?'Conversation saved locally. '+r.sync_error:'',!!r.sync_error);});
  replaceApp(steps(1),el('div',{class:'page-top'},button('← Back to conversations',goHome,'quiet'),el('h1',{},'Review your conversation'),el('p',{class:'muted'},`${d.dialogue.length} messages found. Exclude anything you do not want to share, or edit details before annotating.`)),el('div',{class:'callout'},preview.warning),preview.demo_annotations?el('div',{class:'callout'},'Saved example annotations are loaded only if you keep all messages and their text unchanged. These are test selections, not validated research labels.'):null,el('div',{class:'card'},el('label',{class:'field-label'},'Conversation title'),title),el('div',{class:'divider'}),content,el('div',{class:'review-actions'},button('← Cancel',goHome,'secondary'),confirm));
 }
-async function openConversation(id){await flush();current=await api('/api/conversations/'+id);generation=0;savedGeneration=0;savedDocument=structuredClone(current.document);fieldSaveError=null;validationIssues=[];submitError='';selected=null;label=null;regionsOpen=false;history.replaceState(null,'','#conversation/'+id);renderEditor();}
-function changed(){generation++;fieldSaveError=null;submitError='';validationIssues=validationIssues.filter(issue=>requiredIssues(current.document).some(m=>m.region_id===issue.region_id&&m.field===issue.field));clearTimeout(timer);setSaveStatus('Unsaved changes');timer=setTimeout(()=>{save().catch(e=>tell(e.message,true));},650);}
-function setSaveStatus(message,error=false){const n=document.querySelector('#save-status');if(n){n.textContent=message;n.classList.toggle('error',error);}refreshAnswerFeedback();}
+async function openConversation(id){await flush();current=await api('/api/conversations/'+id);generation=0;savedGeneration=0;savedDocument=structuredClone(current.document);fieldSaveError=null;validationIssues=[];submitError='';clearDockFeedback();selected=null;label=null;regionsOpen=false;history.replaceState(null,'','#conversation/'+id);renderEditor();resetEditorScroll(id);}
+function resetEditorScroll(id){
+ const reset=()=>{if(current?.id!==id)return;const side=document.querySelector('.annotation-side');if(side)side.scrollTop=0;window.scrollTo?.({top:0,left:0,behavior:'instant'});};
+ document.querySelector('#conversation-title')?.focus({preventScroll:true});reset();
+ if(typeof requestAnimationFrame==='function')requestAnimationFrame(reset);
+}
+
+function changed(){generation++;fieldSaveError=null;submitError='';clearDockFeedback();validationIssues=validationIssues.filter(issue=>requiredIssues(current.document).some(m=>m.region_id===issue.region_id&&m.field===issue.field));clearTimeout(timer);refreshAnswerFeedback();timer=setTimeout(()=>{save().catch(e=>tell(e.message,true));},650);}
 function metadata(r){for(const k of ['revision','submission_version','has_changes','synced_version','sync_error','task_id','annotation_id','updated_at'])current[k]=r[k];}
 function savedAnswer(regionId,name){const scope=regionId?savedDocument?.regions.find(r=>r.id===regionId)?.answers:savedDocument?.context;return scope?.[name]||'';}
 function refreshAnswerFeedback(){
@@ -64,24 +77,23 @@ function refreshAnswerFeedback(){
   q.querySelector('.retry-saving').hidden=!(dirty&&!!fieldSaveError);
  });
  refreshValidationFeedback();
- const summary=document.querySelector('#submit-error');if(summary)summary.textContent=submitError;
- const status=document.querySelector('#submission-status');if(status)status.textContent=editorStatus();
- const help=document.querySelector('#export-help');if(help)help.textContent=!current.submission_version?'No submitted annotations yet. Submit this conversation to enable the research ZIP. You can download the current JSON at any time.':current.has_changes||generation!==savedGeneration?'You have draft changes. Submit again to include them in the research ZIP.':'';
+ refreshDockStatus();
+ const help=document.querySelector('#export-help');if(help){help.textContent=!current.submission_version?'Submit to enable research ZIP. Current JSON includes drafts.':current.has_changes||generation!==savedGeneration?'You have draft changes. Submit again to include them in research ZIP.':'Research ZIP contains the latest submitted version.';const control=document.querySelector('#zip-control');if(control){control.setAttribute('title',help.textContent);control.setAttribute('aria-label',help.textContent);}}
 }
 async function save(){
  if(!current||savedGeneration===generation)return;
  if(saving){await saving;return save();}
  const id=current.id,g=generation,document=structuredClone(current.document),revision=current.revision;
- fieldSaveError=null;setSaveStatus('Saving draft…');
+ fieldSaveError=null;refreshAnswerFeedback();
  saving=(async()=>{
-  try{const r=await api(`/api/conversations/${id}/save`,{revision,document});metadata(r);savedDocument=structuredClone(document);savedGeneration=g;fieldSaveError=null;setSaveStatus(g===generation?'All changes saved':'Saving newer changes…');}
-  catch(e){fieldSaveError=e.message;setSaveStatus('Save failed — '+e.message,true);throw e;}
+  try{const r=await api(`/api/conversations/${id}/save`,{revision,document});metadata(r);savedDocument=structuredClone(document);savedGeneration=g;fieldSaveError=null;refreshAnswerFeedback();}
+  catch(e){fieldSaveError=e.message;refreshAnswerFeedback();throw e;}
   finally{saving=null;refreshAnswerFeedback();}
  })();
  refreshAnswerFeedback();await saving;
 }
 async function flush(){clearTimeout(timer);if(saving)await saving;if(current&&savedGeneration!==generation)await save();}
-async function retrySaving(){await flush();refreshAnswerFeedback();}
+async function retrySaving(){clearDockFeedback();await flush();refreshAnswerFeedback();}
 function requiredIssues(doc){
  const issues=[];
  doc.regions.forEach((r,i)=>{
@@ -92,9 +104,17 @@ function requiredIssues(doc){
 function refreshValidationFeedback(){
  document.querySelectorAll('.question').forEach(q=>{const missing=validationIssues.some(m=>m.region_id===q.dataset.regionId&&m.field===q.dataset.field);q.classList.toggle('invalid',missing);const message=q.querySelector('.field-error');if(message)message.textContent=missing?'This answer is required.':'';const input=q.querySelector('.answer-input');if(input)input.setAttribute('aria-invalid',String(missing));});
 }
-function editorStatus(){const s=current.submission_version;return s?`${current.has_changes||generation!==savedGeneration?'Draft changes · ':''}Submission v${s} · ${current.synced_version===s?'Label Studio synced':'Label Studio pending'}`:'Draft · not submitted';}
+function editorStatus(){
+ const s=current.submission_version,unsaved=generation!==savedGeneration;
+ const copy=s?`v${s} ${current.synced_version===s?'synced':'sync pending'}`:'';
+ if(fieldSaveError)return 'Save failed — '+fieldSaveError;
+ if(unsaved)return `${saving?'Saving…':'Unsaved changes'}${s?' · '+copy:''}`;
+ if(!s)return 'Draft saved · not submitted';
+ return current.has_changes?`Draft changes saved · ${copy}`:`Submitted ${copy}`;
+}
+
 async function submit(){
- if(submitting)return;submitting=true;submitError='';
+ if(submitting)return;submitting=true;submitError='';clearDockFeedback();
  document.querySelectorAll('#app button,#app input,#app textarea,#app select').forEach(n=>n.disabled=true);
  try{
   await flush();validationIssues=requiredIssues(current.document);
@@ -102,7 +122,7 @@ async function submit(){
   const document=structuredClone(current.document),g=generation;
   const r=await api(`/api/conversations/${current.id}/submit`,{revision:current.revision,document});
   metadata(r);savedDocument=structuredClone(document);savedGeneration=g;fieldSaveError=null;
-  submitError=r.sync_error?'Submitted locally. The researcher storage copy needs attention; see Researcher: storage status.':'Annotations submitted successfully.';
+  submitError=r.sync_error?'Submitted locally. The researcher storage copy needs attention; see Researcher: storage status.':'';
  }catch(e){validationIssues=e.issues||[];if(validationIssues.length){selected=validationIssues[0].region_id;regionsOpen=true;}submitError=e.message;}
  finally{
   submitting=false;renderEditor();
@@ -166,7 +186,7 @@ function question(f,answers){
   });q.append(group,button('Clear this answer',()=>{answers[f.name]=[];changed();renderEditor();},'quiet small'),error);
  }return q;
 }
-function renderEditor(){if(!current)return;document.body.classList.add('annotating');const doc=current.document;const active=doc.regions.find(r=>r.id===selected);const top=el('div',{class:'editor-top'},el('div',{},button('← Your conversations',()=>goHome().catch(e=>tell(e.message,true)),'quiet back'),el('h1',{},current.data.title),el('p',{class:'small-text'},`${current.data.dialogue.length} messages`)));
+function renderEditor(){if(!current)return;document.body.classList.add('annotating');const doc=current.document;const active=doc.regions.find(r=>r.id===selected);const top=el('div',{class:'editor-top'},el('div',{},button('← Your conversations',()=>goHome().catch(e=>tell(e.message,true)),'quiet back'),el('h1',{id:'conversation-title',tabindex:'-1'},current.data.title),el('p',{class:'small-text'},`${current.data.dialogue.length} messages`)));
  const convo=el('section',{class:'editor-conversation','aria-label':'Conversation transcript',onmouseup:()=>setTimeout(findSelection,0),onkeyup:e=>{if(e.key==='Shift')findSelection();}},
   el('h2',{},'Your conversation'),
   el('p',{class:'annotation-instructions'},"To annotate: 1) choose ‘my text’ (key 1) or ‘AI’s text’ (key 2), 2) highlight the exact text with your mouse. Choose the label again before each new highlight. To annotate a whole message, choose a label and use Select whole message. Highlights can overlap."),
@@ -184,30 +204,27 @@ function renderEditor(){if(!current)return;document.body.classList.add('annotati
  questions.append(el('div',{class:'submit-box'},button('Delete this highlight',()=>{if(!confirm('Delete this highlight and its answers?'))return;doc.regions=doc.regions.filter(r=>r.id!==active.id);selected=null;changed();renderEditor();},'danger')));
  }
  const context=el('section',{class:'annotation-panel conversation-panel'},el('h2',{},'About this conversation (optional)'),el('p',{class:'small-text'},'Background for the whole conversation, independent of individual highlights.'));boot.codebook.fields.filter(f=>f.group==='conversation').forEach(f=>context.append(question(f,doc.context)));
- const exportFeedback=el('p',{id:'export-feedback',class:'operation-status',role:'status','aria-live':'polite'});
- const jsonButton=action('Download current JSON',()=>download(`/api/conversations/${current.id}/current.json`,exportFeedback),'secondary');
- const zipButton=action('Download research ZIP',()=>download(`/api/conversations/${current.id}/export.zip`,exportFeedback),'secondary');
- zipButton.disabled=!current.submission_version;
+ const jsonButton=action('Download current JSON',()=>download(`/api/conversations/${current.id}/current.json`),'secondary');
+ const zipButton=action('Download research ZIP',()=>download(`/api/conversations/${current.id}/export.zip`),'secondary');
+ zipButton.disabled=!current.submission_version;jsonButton.setAttribute('title','Download current saved work, including drafts.');zipButton.setAttribute('aria-describedby','export-help');
+ const zipControl=el('span',{id:'zip-control',class:'download-control',...(zipButton.disabled?{tabindex:'0',role:'group'}:{})},zipButton);
  const research=el('section',{class:'research-panel action-dock','aria-label':'Annotation actions'},
   el('div',{class:'action-dock-inner'},
    el('div',{class:'dock-main'},
-    el('div',{class:'dock-status'},el('span',{id:'submission-status',class:'tag submitted'},editorStatus()),el('span',{id:'save-status',class:'status','aria-live':'polite'},generation===savedGeneration?'All changes saved':'Unsaved changes')),
-    el('div',{class:'button-bar'},jsonButton,zipButton,action('Submit annotations',submit))),
-   el('p',{class:'dock-description'},'Submit saves a version on this computer and copies it to local Label Studio. JSON includes current drafts; ZIP includes the latest submitted version.'),
-   el('p',{id:'export-help',class:'export-help'}),
-   el('p',{id:'submit-error',class:'operation-status'+(validationIssues.length?' error':''),'aria-live':'polite'},submitError),
-   exportFeedback,el('p',{id:'editor-feedback',class:'operation-status',role:'status','aria-live':'polite'})));
+    el('div',{id:'submission-status',class:'dock-status',role:'status','aria-live':'polite'},editorStatus()),
+    el('div',{class:'button-bar'},jsonButton,zipControl,action('Submit annotations',submit))),
+   el('span',{id:'export-help',class:'visually-hidden'})));
  const storage=el('details',{class:'storage-details'},el('summary',{},'Researcher: storage status'),el('p',{class:'small-text'},'Label Studio keeps a copy of submitted annotations. Drafts are stored locally. Retrying storage does not submit drafts.'));
  storage.append(el('p',{class:'small-text'},current.sync_error|| (current.submission_version&&current.synced_version===current.submission_version?'The submitted copy is up to date.':current.submission_version?'The submitted copy is pending.':'No submitted annotations to copy yet.')));
  if(current.sync_error||(current.submission_version&&current.synced_version<current.submission_version)){
   const feedback=el('p',{class:'operation-status',role:'status','aria-live':'polite'});
-  storage.append(action('Retry storage copy',async()=>{try{await flush();const r=await api(`/api/conversations/${current.id}/sync`,{});metadata(r);localStatus(feedback,r.sync_error||'Storage copy is up to date.',!!r.sync_error);}catch(e){localStatus(feedback,e.message,true);}},'secondary'),feedback);
+  storage.append(action('Retry storage copy',async()=>{try{await flush();const r=await api(`/api/conversations/${current.id}/sync`,{});metadata(r);refreshAnswerFeedback();localStatus(feedback,r.sync_error||'Storage copy is up to date.',!!r.sync_error);}catch(e){localStatus(feedback,e.message,true);}},'secondary'),feedback);
  }
 
 
  notice.textContent='';replaceApp(top,el('div',{class:'editor-grid'},convo,el('aside',{class:'annotation-side'},regions,active?questions:null,context,storage)),research);
  if(typeof ResizeObserver!=='undefined'){actionBarObserver=new ResizeObserver(entries=>{document.documentElement.style.setProperty('--action-dock-height',`${Math.ceil(entries[0].target.getBoundingClientRect().height)}px`);});actionBarObserver.observe(research);}
- refreshAnswerFeedback();if(fieldSaveError)setSaveStatus('Save failed — '+fieldSaveError,true);}
+ refreshAnswerFeedback();}
 function regionButton(r,i){const b=button('',()=>chooseRegion(r.id),'region-item'+(r.id===selected?' active':''));b.append(el('span',{},`${i+1} · ${r.passage_type} · ${Object.values(r.answers).filter(v=>v.length).length} answers`),regionQuote(r).slice(0,130));return b;}
 window.addEventListener('keydown',e=>{if(!current||submitting||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)||e.ctrlKey||e.metaKey||e.altKey)return;if(e.key==='1'||e.key==='2'){e.preventDefault();armLabel(e.key==='1'?'my text':"AI's text");}});
 window.addEventListener('beforeunload',e=>{if(generation!==savedGeneration){e.preventDefault();e.returnValue='';}});

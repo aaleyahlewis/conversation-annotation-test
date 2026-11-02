@@ -30,6 +30,7 @@ function setup(){
   const payload=options?.body?JSON.parse(options.body):null;state.requests.push({url,payload});
   if(url.endsWith('/save')){if(state.gate)await state.gate;if(state.rejectSave)return{ok:false,json:async()=>({error:'Simulated offline save'})};state.document=structuredClone(payload.document);state.revision++;return{ok:true,json:async()=>({revision:state.revision,submission_version:0,synced_version:0,has_changes:true,sync_error:null})};}
   if(url.endsWith('/submit'))return{ok:true,json:async()=>({revision:++state.revision,submission_version:1,synced_version:1,has_changes:false,sync_error:null})};
+  if((url.endsWith('.json')||url.endsWith('.zip'))&&state.downloadGate)await state.downloadGate;
   if(url.endsWith('.json')||url.endsWith('.zip'))return{ok:!state.downloadError,json:async()=>({error:'Export failed nearby'}),blob:async()=>new Blob(['test'])};
   throw Error('Unexpected request: '+url);
  }});
@@ -61,8 +62,8 @@ test('character counter and saved-answer status follow server acknowledgement',a
 });
 test('failed saves never report saved; retry recovers latest text',async()=>{
  const s=setup();add(s);const input=type(s,'field-user_why','Keep my explanation');s.state.rejectSave=true;
- await assert.rejects(s.run('save()'),/Simulated offline/);assert.equal(input.parent.querySelector('.answer-count').textContent,'0 / 1 saved answers');assert.equal(input.parent.querySelector('.answer-state').textContent,'Not saved. Retry saving.');
- s.state.rejectSave=false;await input.parent.querySelector('.retry-saving').click();assert.equal(input.parent.querySelector('.answer-state').textContent,'Saved to draft');assert.equal(s.state.document.regions[0].answers.user_why,'Keep my explanation');
+ await assert.rejects(s.run('save()'),/Simulated offline/);assert.match(s.document.querySelector('#submission-status').textContent,/Save failed/);assert.equal(input.parent.querySelector('.answer-count').textContent,'0 / 1 saved answers');assert.equal(input.parent.querySelector('.answer-state').textContent,'Not saved. Retry saving.');
+ s.run("tell(fieldSaveError,true)");s.state.rejectSave=false;await input.parent.querySelector('.retry-saving').click();assert.doesNotMatch(s.document.querySelector('#submission-status').textContent,/offline|failed/i);assert.equal(input.parent.querySelector('.answer-state').textContent,'Saved to draft');assert.equal(s.state.document.regions[0].answers.user_why,'Keep my explanation');
 });
 test('in-flight edits and region switching do not lose text or mislabel saved status',async()=>{
  const s=setup();add(s);type(s,'field-user_why','First');let release;s.state.gate=new Promise(r=>release=r);const pending=s.run('save()');await Promise.resolve();type(s,'field-user_why','Latest');release();await pending;s.state.gate=null;
@@ -73,7 +74,7 @@ test('automatic saving includes latest global text in formal submission without 
  const s=setup();type(s,'field-conversation_additional_context','Newest explanation');await s.run('submit()');
  const submission=s.state.requests.find(r=>r.url.endsWith('/submit'));assert.equal(submission.payload.document.context.conversation_additional_context,'Newest explanation');assert.equal(s.run('submitting'),false);
  assert.equal(s.document.querySelector('.save-answer'),null);assert.equal(s.document.querySelector('.save-shortcut'),null);
- type(s,'field-conversation_additional_context','Draft after submission');assert.match(s.document.querySelector('#export-help').textContent,/draft changes/);assert.match(s.document.querySelector('#submission-status').textContent,/Draft changes/);
+ type(s,'field-conversation_additional_context','Draft after submission');assert.match(s.document.querySelector('#export-help').textContent,/draft changes/);assert.match(s.document.querySelector('#submission-status').textContent,/Unsaved changes/);
 });
 test('required rules and one-line Other input; optional wording is not repeated',async()=>{
  const s=setup();add(s);
@@ -81,17 +82,25 @@ test('required rules and one-line Other input; optional wording is not repeated'
  assert.equal(s.document.querySelector('#field-user_why').attributes['aria-required'],'true');assert.equal(s.document.querySelectorAll('.optional').length,0);assert.equal(s.document.querySelectorAll('.required-mark').length,0);
  assert.equal(s.document.querySelector('#field-user_why').parent.querySelector('.answer-state').textContent,'');
  await s.run('submit()');assert.equal(s.state.requests.some(r=>r.url.endsWith('/submit')),false);
- assert.match(s.document.querySelector('#submit-error').textContent,/required/);assert.equal(s.run('validationIssues.length'),6);
+ assert.match(s.document.querySelector('#submission-status').textContent,/required/);assert.equal(s.run('validationIssues.length'),6);
  const region=s.run('current.document.regions[0]');for(const f of JSON.parse(fs.readFileSync(path.join(ROOT,'config/codebook.json'))).fields.filter(f=>f.group==='user'&&f.required)){s.ctx.__name=f.name;s.ctx.__value=f.type==='text'?'Required test answer':[f.options[0]];s.run('current.document.regions[0].answers[__name]=__value;changed()');}
  await s.run('submit()');assert.equal(s.state.requests.filter(r=>r.url.endsWith('/submit')).length,1);
 });
 test('research ZIP is disabled before submission, draft JSON remains usable and errors are inline',async()=>{
  const s=setup();const panel=s.document.querySelector('.research-panel'),buttons=panel.querySelectorAll('button');
- assert.equal(panel.classList.contains('action-dock'),true);assert.equal(buttons[2].textContent,'Submit annotations');assert.equal(s.app.querySelectorAll('button').filter(b=>b.textContent==='Submit annotations').length,1);
- s.run("tell('Save failed near controls',true)");assert.equal(s.document.querySelector('#notice').textContent,'');assert.equal(s.document.querySelector('#editor-feedback').textContent,'Save failed near controls');
+ assert.equal(panel.classList.contains('action-dock'),true);assert.equal(panel.querySelector('.dock-description'),null);assert.equal(panel.querySelector('#save-status'),null);assert.equal(panel.querySelector('#export-help').classList.contains('visually-hidden'),true);assert.match(panel.querySelector('#zip-control').getAttribute('title'),/Submit to enable/);assert.equal(buttons[2].textContent,'Submit annotations');assert.equal(s.app.querySelectorAll('button').filter(b=>b.textContent==='Submit annotations').length,1);
+ s.run("tell('Save failed near controls',true)");assert.equal(s.document.querySelector('#notice').textContent,'');assert.equal(s.document.querySelector('#submission-status').textContent,'Save failed near controls');
  s.run("labelHint('Choose a label first')");assert.equal(s.document.querySelector('#label-status').textContent,'Choose a label first');
  assert.equal(buttons[0].textContent,'Download current JSON');assert.equal(buttons[1].textContent,'Download research ZIP');assert.equal(buttons[1].disabled,true);
- assert.match(panel.textContent,/No submitted annotations yet/);await buttons[1].click();assert.equal(s.state.requests.length,0);
- s.state.downloadError=true;await buttons[0].click();assert.equal(s.document.querySelector('#export-feedback').textContent,'Export failed nearby');assert.equal(s.document.querySelector('#notice').textContent,'');
- s.state.downloadError=false;await buttons[0].click();assert.match(s.document.querySelector('#export-feedback').textContent,/JSON downloaded/);
+ assert.match(panel.textContent,/Submit to enable research ZIP/);await buttons[1].click();assert.equal(s.state.requests.length,0);
+ s.state.downloadError=true;await buttons[0].click();assert.equal(s.document.querySelector('#submission-status').textContent,'Export failed nearby');assert.equal(s.document.querySelector('#notice').textContent,'');
+ s.state.downloadError=false;await buttons[0].click();assert.match(s.document.querySelector('#submission-status').textContent,/JSON downloaded/);
+ s.run('current.submission_version=1;current.synced_version=1;renderEditor()');const zip=s.document.querySelector('.research-panel').querySelectorAll('button')[1];await zip.click();assert.equal(s.document.querySelector('#submission-status').textContent,'Research ZIP downloaded.');assert.equal(s.document.querySelector('.research-panel').querySelector('.operation-status'),null);
+});
+
+test('a late download result cannot replace another conversation status',async()=>{
+ const s=setup();let release;s.state.downloadGate=new Promise(r=>release=r);
+ const pending=s.run("download('/api/conversations/fake/current.json')");await Promise.resolve();await Promise.resolve();
+ s.run("current.id='another';clearDockFeedback();renderEditor()");release();await pending;
+ assert.equal(s.document.querySelector('#submission-status').textContent,'Draft saved · not submitted');
 });

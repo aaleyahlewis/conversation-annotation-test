@@ -20,6 +20,8 @@ def main():
     paths = sorted(set(p.decode('utf-8') for p in git(
         'ls-files', '--cached', '--others', '--exclude-standard', '-z'
     ).split(b'\0') if p))
+    deleted = {p.decode('utf-8') for p in git('ls-files', '--deleted', '-z').split(b'\0') if p}
+    paths = [name for name in paths if name not in deleted]
     issues = []
     rules = {
         'personal home-directory path': r'/(?:Users|home)/[A-Za-z0-9_.-]+/',
