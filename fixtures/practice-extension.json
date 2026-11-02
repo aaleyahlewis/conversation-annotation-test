@@ -1,0 +1,53 @@
+{
+  "data": {
+    "title": "Practice: essay extension and disclosure (FICTIONAL TEST DATA)",
+    "participant_id": "TEST01",
+    "conversation_id": "practice-extension-001",
+    "codebook_version": "typology-v1",
+    "dialogue": [
+      {
+        "message_id": "practice-msg-1",
+        "role": "user",
+        "author": "You",
+        "index": 0,
+        "text": "I need to ask my professor for two extra days on an essay. I have ADHD and need more time to organize my notes, but I do not want to disclose my diagnosis. Please keep the email direct and polite, without making me sound incapable."
+      },
+      {
+        "message_id": "practice-msg-2",
+        "role": "assistant",
+        "author": "ChatGPT",
+        "index": 1,
+        "text": "Dear Professor Lee,\n\nBecause of my ADHD, I am struggling to keep up with the course. Could I please have two extra days to submit the essay? I am sorry for the inconvenience.\n\nBest,\nAlex"
+      },
+      {
+        "message_id": "practice-msg-3",
+        "role": "user",
+        "author": "You",
+        "index": 2,
+        "text": "You included my diagnosis even though I asked you not to. Please remove it and explain that I need time to organize my notes. I also do not want to say that I cannot keep up with the course."
+      },
+      {
+        "message_id": "practice-msg-4",
+        "role": "assistant",
+        "author": "ChatGPT",
+        "index": 3,
+        "text": "Dear Professor Lee,\n\nCould I submit the essay two days after the deadline? I need some additional time to organize my notes and put together a clear argument. Thank you for considering my request.\n\nBest,\nAlex"
+      },
+      {
+        "message_id": "practice-msg-5",
+        "role": "user",
+        "author": "You",
+        "index": 4,
+        "text": "This keeps the reason without sharing my diagnosis. Can you make it shorter and a little less formal?"
+      },
+      {
+        "message_id": "practice-msg-6",
+        "role": "assistant",
+        "author": "ChatGPT",
+        "index": 5,
+        "text": "Hi Professor Lee,\n\nCould I have two extra days for the essay? I need a little more time to organize my notes. Thanks for considering it.\n\nAlex"
+      }
+    ],
+    "max": 6
+  }
+}

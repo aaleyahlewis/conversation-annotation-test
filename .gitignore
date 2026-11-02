@@ -1,0 +1,40 @@
+# Local services, conversations, participant data and credentials
+.local/
+.venv/
+.env
+.env.*
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.sqlite3-*
+*.db
+*.db-*
+*.log
+*.pem
+*.key
+exports/
+backups/
+data/
+current-annotations*.json
+annotations.json
+label_studio_raw.json
+annotation-data*.zip
+
+# Development screenshots are local review artifacts, not source assets
+docs/*.png
+docs/*.jpg
+docs/*.jpeg
+
+# Generated files and editor state
+__pycache__/
+*.pyc
+.DS_Store
+tmp/
+dist/
+.pytest_cache/
+.coverage
+htmlcov/
+.idea/
+.vscode/
+.codex/
+.agents/
