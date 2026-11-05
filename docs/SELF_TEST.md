@@ -58,12 +58,15 @@ Your words should open. The label should disarm, so choose it again before anoth
 
 | Field | Example answer |
 | --- | --- |
-| WHY: What were you trying to accomplish… | I wanted help asking for an essay extension while keeping my diagnosis private. |
-| WHY: Why did you communicate… | I needed more time to organize my notes. I wanted my professor to understand the request without assuming I was incapable. |
-| WHERE | Select Educational. |
+| What accessibility support were you trying to accomplish with AI? | I wanted help asking for an essay extension while keeping my diagnosis private. |
+| Why were you seeking this support? | I needed more time to organize my notes. I wanted my professor to understand the request without assuming I was incapable. |
+| What were you trying to adjust? | Select My language and I was managing my self-disclosure. |
 | If Other… | Leave blank; this should be a one-line input. |
-| HOW: Where did you adjust… | Select Interacting with AI and Interacting through AI. |
-| HOW: What did you do? | Select Managing identity disclosure, Modifying self-presentation, and Adjusting tone or communication style. |
+| What were you hoping the AI would do in this moment? | Keep my request direct and polite without disclosing my diagnosis. |
+| Why did this adjustment matter to you? | I wanted to ask for support without sharing a diagnosis I had chosen to keep private. |
+| In what communication context was this? | Select Educational. |
+| In this instance, which best describes what happened? | Select I used AI to help me adjust how I communicate, behave, or present myself to someone else. |
+| Benefits or challenges | It helped me ask for more time, but I was concerned the AI might disclose information I wanted to keep private. |
 | Is there anything else… | I told the AI which information to keep private and how I wanted to sound in the email. |
 
 Wait for **All changes saved** in the bottom bar. Filled text fields should show their character count, **1 / 1 saved answers**, and **Saved to draft**. There is no Add or Save answer step.
@@ -74,17 +77,14 @@ Choose **AI's text** (or press 2 while not typing), then use **Select whole mess
 
 | Field | Example answer |
 | --- | --- |
-| What did the AI do? | Select Ignored or misunderstood my preferences, Introduced assumptions about me or my communication, and Did not provide the support I requested. |
-| What did the AI do in this response? | The AI disclosed my diagnosis despite my explicit request not to. It also added that I was struggling to keep up with the course, which I had not said. |
-| Optional AI role | Select Undermining and Necessitating. |
-| Why did you characterize the AI's role… | It undermined my stated disclosure boundary. Its mistake also made me send another prompt to remove the diagnosis and the assumption about my ability. |
-| Benefits | Select No benefits experienced. |
-| Challenges | Select Required additional effort or revisions, Introduced unwanted assumptions, Created disclosure or privacy concerns, and Misrepresented my identity or expression. |
-| How did this response affect… | I could not use this draft. I had to spend additional effort correcting information that could disclose my diagnosis and misrepresent me. |
-| Did you change your approach… | Select Yes. |
-| If you changed your approach… | In the next message, I explicitly asked the AI to remove my diagnosis and the claim that I could not keep up with the course. |
-
-The two role selections test multiple choices under one example interpretation. They are not prescribed answers for real participants.
+| What did AI do in this highlighted passage? | Select Ignored or misunderstood my preferences, Did not provide the support I requested, and Changed or took out important meanings in my message. |
+| How did this compare with what you wanted? | The AI disclosed my diagnosis despite my explicit request not to. It also added that I was struggling to keep up with the course, which I had not said. |
+| What did AI do particularly well? | Select I did not experience any benefits. |
+| What did AI do particularly poorly? | Select Required more effort for revisions and Misrepresented my identity. |
+| How would you have liked the AI to support you differently? | I wanted a draft that asked for more time without disclosing my diagnosis or adding assumptions about my ability. |
+| Would you have wanted AI to respond differently? | Yes. It should have followed my request not to include my diagnosis and explained that I needed time to organize my notes. |
+| What did you do after this response? | Select I re-prompted the AI to change it. |
+| What prompted this action, and did it require extra effort? | I explicitly asked the AI to remove my diagnosis and the claim that I could not keep up with the course. |
 
 ## Region 3: the AI follows the correction
 
@@ -92,21 +92,20 @@ Choose **AI's text** again and use **Select whole message** on Message 4. Region
 
 | Field | Example answer |
 | --- | --- |
-| What did the AI do? | Select Provided the support I requested and Helped organize or structure my communication. |
-| What did the AI do in this response? | The revised draft asked for two extra days, kept the explanation about organizing my notes, and removed my diagnosis and the claim that I could not keep up. |
-| Optional AI role | Select Supporting. |
-| Why did you characterize the AI's role… | I initiated the correction, and the AI followed my request to explain the need without disclosing the diagnosis. |
-| Benefits | Select Helped manage identity disclosure and Increased control over my communication. |
-| Challenges | Select No challenges experienced. |
-| How did this response affect… | This revision respected my disclosure boundary and gave me a usable draft. I still wanted it shorter and less formal. |
-| Did you change your approach… | Select Yes. |
-| If you changed your approach… | I next asked for a shorter and less formal version, without changing my privacy goal. |
+| What did AI do in this highlighted passage? | Select Preserved my language or expression and Suggested changes to my communication that were helpful. |
+| How did this compare with what you wanted? | The revised draft asked for two extra days, kept the explanation about organizing my notes, and removed my diagnosis and the claim that I could not keep up. |
+| What did AI do particularly well? | Select Saved time and Helped me manage identity disclosure. |
+| What did AI do particularly poorly? | Select I did not experience any challenges. |
+| How would you have liked the AI to support you differently? | This revision worked well. I would still like it shorter and less formal. |
+| Would you have wanted AI to respond differently? | No. The AI followed my request to explain the need without disclosing the diagnosis. |
+| What did you do after this response? | Select I manually changed it. |
+| What prompted this action, and did it require extra effort? | I asked for a shorter and less formal version without changing my privacy goal. |
 
-Only create these three regions for this test. Messages 3, 5, and 6 do not need their own regions. To test that the role selection is optional, clear it for Region 3 while leaving the other answers filled. Submission should still succeed. The separate role explanation is currently required.
+Only create these three regions for this test. Messages 3, 5, and 6 do not need their own regions.
 
 ## Conversation background
 
-This section is optional and separate from region answers. You can leave both fields blank or use:
+This section is required and separate from region answers. Use:
 
 - First field: I wanted to request a short deadline extension without disclosing my diagnosis.
 - Second field: For this fictional practice scenario, keeping control over disclosure mattered more than making the email very formal.
@@ -115,7 +114,7 @@ This section is optional and separate from region answers. You can leave both fi
 
 1. Add one simple emoji to a text answer, wait for All changes saved, and refresh. Reopen the region and confirm the text survived. A simple emoji counts as one code point. Some combined emoji use more than one code point. Remove the test emoji and wait for saving.
 2. Switch between the three regions. Each should keep its own answers and selected options. Clicking a highlight should open the matching region.
-3. Temporarily clear the first WHY answer in Region 1 and submit. Submission should stop, focus the missing field, and show a nearby required-answer message. Restore the answer.
+3. Temporarily clear a required answer in Region 1 and submit. Submission should stop, focus the missing field, and show a nearby required-answer message. Restore the answer. Also try clearing either conversation-level answer; those are required too.
 4. Before the first submission, download current JSON. It should contain six messages, three regions, your draft answers, and draft status. The research ZIP button should be disabled with an explanation.
 5. Submit from the bottom bar. Expect a submission version and success message. When local Label Studio is available, expect Label Studio synced.
 6. Download the research ZIP. It should contain eight files: annotations.json, label_studio_raw.json, codebook.json, conversations.csv, regions.csv, region_choices.csv, manifest.json, and data_dictionary.md. Check that the submitted annotation has three regions and that sync_warnings is empty when sync succeeds.

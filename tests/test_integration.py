@@ -22,6 +22,13 @@ from app.core import ROOT, CODEBOOK, from_ls, normalize_conversation
 def complete_test_answers(document):
     """Populate fake responses only in integration fixtures, never in the app."""
     document = copy.deepcopy(document)
+    for field in CODEBOOK["fields"]:
+        if (
+            field["group"] == "conversation"
+            and field.get("required")
+            and not document["context"].get(field["name"])
+        ):
+            document["context"][field["name"]] = "Integration test context"
     for region in document["regions"]:
         group = "user" if region["passage_type"] == "my text" else "ai"
         for field in CODEBOOK["fields"]:
@@ -146,6 +153,13 @@ class LocalIntegration(unittest.TestCase):
             self.assertEqual(manifest["verified_raw_task_count"], 1)
             raw = json.loads(archive.read("label_studio_raw.json"))
             restored = from_ls(raw[0]["annotations"][0]["result"], c["data"])
+            for document in (restored, doc):
+                for region in document["regions"]:
+                    region["answers"] = {
+                        name: value
+                        for name, value in region["answers"].items()
+                        if not name.startswith("legacy_")
+                    }
             self.assertEqual(restored, doc)
             self.assertIn("region_choices.csv", archive.namelist())
         # Unsubmitted edits must not leak into the research export.
@@ -213,7 +227,7 @@ class LocalIntegration(unittest.TestCase):
                         }
                     ],
                     "answers": {
-                        "ai_behavior": ["Modified my language or tone"],
+                        "ai_behavior": ["Modified my language or expression"],
                         "ai_behavior_explanation": "Both roles preserved",
                     },
                 }

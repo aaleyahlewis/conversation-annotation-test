@@ -9,6 +9,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CODEBOOK = json.loads((ROOT / "config/codebook.json").read_text())
 FIELDS = {f["name"]: f for f in CODEBOOK["fields"]}
+LEGACY_FIELDS = {f["name"]: f for f in CODEBOOK["legacy_fields"]}
+LEGACY_SOURCES = {
+    source: field["name"]
+    for field in CODEBOOK["legacy_fields"]
+    for source in field["source_names"]
+}
 LABELS = ["my text", "AI's text"]
 
 
@@ -91,6 +97,38 @@ def validate_document(doc, data):
         cleaned = {}
         for name, value in values.items():
             f = FIELDS.get(name)
+            legacy_name = (
+                LEGACY_SOURCES.get(name)
+                if not f and name not in LEGACY_FIELDS
+                else None
+            )
+            if legacy_name:
+                name = legacy_name
+                f = LEGACY_FIELDS[name]
+            elif name in LEGACY_FIELDS:
+                f = LEGACY_FIELDS[name]
+            elif f and f["type"] in ("multiple", "single"):
+                valid = (
+                    isinstance(value, list)
+                    and len(value) == len(set(value))
+                    and all(v in f["options"] for v in value)
+                    and (f["type"] != "single" or len(value) <= 1)
+                )
+                if not valid and f.get("legacy_name"):
+                    legacy_name = f["legacy_name"]
+                    old_field = LEGACY_FIELDS[legacy_name]
+                    old_valid = (
+                        isinstance(value, list)
+                        and len(value) == len(set(value))
+                        and all(v in old_field["options"] for v in value)
+                        and (
+                            old_field["type"] != "single" or len(value) <= 1
+                        )
+                    )
+                    if not old_valid:
+                        raise ValueError(f"Invalid choices: {name}")
+                    cleaned[legacy_name] = value
+                    continue
             if not f or f["group"] != group:
                 raise ValueError(f"Unexpected answer field: {name}")
             if f["type"] == "text":
@@ -166,8 +204,21 @@ def validate_document(doc, data):
 
 
 def required_issues(document):
-    """Drafts may be incomplete. Enforce required per-region answers at submission."""
+    """Drafts may be incomplete. Enforce required answers at submission."""
     issues = []
+    for field in CODEBOOK["fields"]:
+        if field["group"] != "conversation" or not field.get("required"):
+            continue
+        value = document["context"].get(field["name"])
+        if not value or not value.strip():
+            issues.append(
+                {
+                    "region_id": "",
+                    "region_number": None,
+                    "field": field["name"],
+                    "prompt": field["prompt"],
+                }
+            )
     for index, region in enumerate(document["regions"]):
         group = "user" if region["passage_type"] == "my text" else "ai"
         for field in CODEBOOK["fields"]:
@@ -239,7 +290,7 @@ def to_ls(doc, data):
             "passage_type", "paragraphlabels", {"paragraphlabels": [r["passage_type"]]}
         )
         for name, answer in r["answers"].items():
-            if answer:
+            if answer and name in FIELDS:
                 emit(
                     name,
                     "textarea" if FIELDS[name]["type"] == "text" else "choices",

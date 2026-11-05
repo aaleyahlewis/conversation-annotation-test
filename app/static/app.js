@@ -96,6 +96,7 @@ async function flush(){clearTimeout(timer);if(saving)await saving;if(current&&sa
 async function retrySaving(){clearDockFeedback();await flush();refreshAnswerFeedback();}
 function requiredIssues(doc){
  const issues=[];
+ boot.codebook.fields.filter(f=>f.group==='conversation'&&f.required).forEach(f=>{const v=doc.context[f.name];if(typeof v==='string'?!v.trim():!v?.length)issues.push({region_id:'',region_number:null,field:f.name,prompt:f.prompt});});
  doc.regions.forEach((r,i)=>{
   const group=r.passage_type==='my text'?'user':'ai';
   boot.codebook.fields.filter(f=>f.group===group&&f.required).forEach(f=>{const v=r.answers[f.name];if(typeof v==='string'?!v.trim():!v?.length)issues.push({region_id:r.id,region_number:i+1,field:f.name,prompt:f.prompt});});
@@ -203,7 +204,7 @@ function renderEditor(){if(!current)return;document.body.classList.add('annotati
  boot.codebook.fields.filter(f=>f.group===(active.passage_type==='my text'?'user':'ai')).forEach(f=>questions.append(question(f,active.answers)));
  questions.append(el('div',{class:'submit-box'},button('Delete this highlight',()=>{if(!confirm('Delete this highlight and its answers?'))return;doc.regions=doc.regions.filter(r=>r.id!==active.id);selected=null;changed();renderEditor();},'danger')));
  }
- const context=el('section',{class:'annotation-panel conversation-panel'},el('h2',{},'About this conversation (optional)'),el('p',{class:'small-text'},'Background for the whole conversation, independent of individual highlights.'));boot.codebook.fields.filter(f=>f.group==='conversation').forEach(f=>context.append(question(f,doc.context)));
+ const context=el('section',{class:'annotation-panel conversation-panel'},el('h2',{},'About this conversation'),el('p',{class:'small-text'},'Background for the whole conversation, independent of individual highlights.'));boot.codebook.fields.filter(f=>f.group==='conversation').forEach(f=>context.append(question(f,doc.context)));
  const jsonButton=action('Download current JSON',()=>download(`/api/conversations/${current.id}/current.json`),'secondary');
  const zipButton=action('Download research ZIP',()=>download(`/api/conversations/${current.id}/export.zip`),'secondary');
  zipButton.disabled=!current.submission_version;jsonButton.setAttribute('title','Download current saved work, including drafts.');zipButton.setAttribute('aria-describedby','export-help');

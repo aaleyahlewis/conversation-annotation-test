@@ -10,7 +10,7 @@ One local website handles import, review, highlighting, answers, submission, and
 - `app/extractor.py`: bounded public shared-page fetching and experimental serialized-page decoding. It does not execute shared-page scripts.
 - `app/core.py`: conversation validation, region validation, and Label Studio result adapters.
 - `app/server.py`: localhost HTTP API, SQLite persistence, submission snapshots, sync, and export.
-- `config/codebook.json`: 18 answer fields, option lists, and required rules.
+- `config/codebook.json`: 23 active answer fields, option lists, and required rules.
 - `config/label_config.xml`: matching local Label Studio configuration.
 - `scripts/start_local.py`: starts the app on port 8765 and Label Studio on port 8080.
 - `fixtures/`: fictional examples only.

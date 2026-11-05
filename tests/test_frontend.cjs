@@ -71,8 +71,8 @@ test('in-flight edits and region switching do not lose text or mislabel saved st
  s.run('chooseRegion(null)');s.run('chooseRegion(current.document.regions[0].id)');assert.equal(s.document.querySelector('#field-user_why').value,'Latest');assert.equal(s.document.querySelector('#field-user_why').parent.querySelector('.answer-count').textContent,'1 / 1 saved answers');
 });
 test('automatic saving includes latest global text in formal submission without manual save controls',async()=>{
- const s=setup();type(s,'field-conversation_additional_context','Newest explanation');await s.run('submit()');
- const submission=s.state.requests.find(r=>r.url.endsWith('/submit'));assert.equal(submission.payload.document.context.conversation_additional_context,'Newest explanation');assert.equal(s.run('submitting'),false);
+ const s=setup();type(s,'field-conversation_accessibility_context','Support goal');type(s,'field-conversation_additional_context','Newest explanation');await s.run('submit()');
+ const submission=s.state.requests.find(r=>r.url.endsWith('/submit'));assert.equal(submission.payload.document.context.conversation_accessibility_context,'Support goal');assert.equal(submission.payload.document.context.conversation_additional_context,'Newest explanation');assert.equal(s.run('submitting'),false);
  assert.equal(s.document.querySelector('.save-answer'),null);assert.equal(s.document.querySelector('.save-shortcut'),null);
  type(s,'field-conversation_additional_context','Draft after submission');assert.match(s.document.querySelector('#export-help').textContent,/draft changes/);assert.match(s.document.querySelector('#submission-status').textContent,/Unsaved changes/);
 });
@@ -82,8 +82,9 @@ test('required rules and one-line Other input; optional wording is not repeated'
  assert.equal(s.document.querySelector('#field-user_why').attributes['aria-required'],'true');assert.equal(s.document.querySelectorAll('.optional').length,0);assert.equal(s.document.querySelectorAll('.required-mark').length,0);
  assert.equal(s.document.querySelector('#field-user_why').parent.querySelector('.answer-state').textContent,'');
  await s.run('submit()');assert.equal(s.state.requests.some(r=>r.url.endsWith('/submit')),false);
- assert.match(s.document.querySelector('#submission-status').textContent,/required/);assert.equal(s.run('validationIssues.length'),6);
- const region=s.run('current.document.regions[0]');for(const f of JSON.parse(fs.readFileSync(path.join(ROOT,'config/codebook.json'))).fields.filter(f=>f.group==='user'&&f.required)){s.ctx.__name=f.name;s.ctx.__value=f.type==='text'?'Required test answer':[f.options[0]];s.run('current.document.regions[0].answers[__name]=__value;changed()');}
+ assert.match(s.document.querySelector('#submission-status').textContent,/required/);assert.equal(s.run('validationIssues.length'),11);
+ for(const f of JSON.parse(fs.readFileSync(path.join(ROOT,'config/codebook.json'))).fields.filter(f=>f.group==='user'&&f.required)){s.ctx.__name=f.name;s.ctx.__value=f.type==='text'?'Required test answer':[f.options[0]];s.run('current.document.regions[0].answers[__name]=__value;changed()');}
+ for(const f of JSON.parse(fs.readFileSync(path.join(ROOT,'config/codebook.json'))).fields.filter(f=>f.group==='conversation'&&f.required)){s.ctx.__name=f.name;s.ctx.__value='Required context';s.run('current.document.context[__name]=__value;changed()');}
  await s.run('submit()');assert.equal(s.state.requests.filter(r=>r.url.endsWith('/submit')).length,1);
 });
 test('research ZIP is disabled before submission, draft JSON remains usable and errors are inline',async()=>{

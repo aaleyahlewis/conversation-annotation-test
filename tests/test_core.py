@@ -26,7 +26,7 @@ class AnnotationTests(unittest.TestCase):
 
         root = ET.fromstring((ROOT / "config/label_config.xml").read_text())
         controls = [x for x in root.iter() if x.tag in ("TextArea", "Choices")]
-        self.assertEqual(len(controls), 18)
+        self.assertEqual(len(controls), len(CODEBOOK["fields"]))
         self.assertEqual(
             {x.get("name") for x in controls}, {f["name"] for f in CODEBOOK["fields"]}
         )
@@ -35,6 +35,11 @@ class AnnotationTests(unittest.TestCase):
             self.assertEqual(f["required"], x.get("required") == "true")
             if f["type"] == "text":
                 self.assertEqual(f["rows"], int(x.get("rows", "1")))
+            else:
+                self.assertEqual(
+                    x.get("choice"),
+                    "single-radio" if f["type"] == "single" else "multiple",
+                )
             self.assertEqual(
                 f["options"], [c.get("value") for c in x if c.tag == "Choice"]
             )
@@ -44,7 +49,15 @@ class AnnotationTests(unittest.TestCase):
         self.assertEqual(len(doc["regions"]), 5)
         # Preserve the original manually chosen label, even on assistant source text.
         self.assertEqual(doc["regions"][2]["passage_type"], "my text")
-        self.assertEqual(doc, from_ls(to_ls(doc, self.data), self.data))
+        roundtrip = from_ls(to_ls(doc, self.data), self.data)
+        for document in (doc, roundtrip):
+            for region in document["regions"]:
+                region["answers"] = {
+                    name: value
+                    for name, value in region["answers"].items()
+                    if not name.startswith("legacy_")
+                }
+        self.assertEqual(doc, roundtrip)
 
     def test_unicode_overlap_multimessage_roundtrip(self):
         data = normalize_conversation(
@@ -101,8 +114,9 @@ class AnnotationTests(unittest.TestCase):
                         if field["type"] == "text"
                         else [field["options"][0]]
                     )
-            region["answers"].pop("user_where_other", None)
-            region["answers"].pop("ai_role", None)
+        for field in CODEBOOK["fields"]:
+            if field["group"] == "conversation" and field["required"]:
+                doc["context"][field["name"]] = "Required context"
         self.assertEqual(required_issues(doc), [])
         doc["regions"][0]["answers"]["ai_behavior_explanation"] = "  "
         self.assertEqual(required_issues(doc)[0]["field"], "ai_behavior_explanation")
@@ -136,6 +150,56 @@ class AnnotationTests(unittest.TestCase):
         ]:
             clean = validate_document(doc, self.data)
             self.assertEqual(clean, from_ls(to_ls(clean, self.data), self.data))
+        incomplete = validate_document({"regions": [], "context": {}}, self.data)
+        self.assertEqual(
+            {issue["field"] for issue in required_issues(incomplete)},
+            {
+                field["name"]
+                for field in CODEBOOK["fields"]
+                if field["group"] == "conversation"
+            },
+        )
+
+    def test_existing_draft_answers_are_preserved_outside_new_questions(self):
+        message = self.data["dialogue"][0]
+        old = {
+            "regions": [
+                {
+                    "id": "old-region",
+                    "passage_type": "my text",
+                    "segments": [
+                        {
+                            "message_id": message["message_id"],
+                            "start": 0,
+                            "end": 6,
+                        }
+                    ],
+                    "answers": {
+                        "user_how_strategy": [
+                            "Adjusting language or linguistic expression"
+                        ],
+                        "user_where": ["Professional / Workplace"],
+                        "user_how_site": ["Interacting through AI"],
+                        "user_strategy_explanation": "Previously saved explanation",
+                    },
+                }
+            ],
+            "context": {},
+        }
+        migrated = validate_document(old, self.data)
+        answers = migrated["regions"][0]["answers"]
+        self.assertEqual(
+            answers["legacy_user_how_strategy"],
+            ["Adjusting language or linguistic expression"],
+        )
+        self.assertEqual(answers["legacy_user_where"], ["Professional / Workplace"])
+        self.assertEqual(answers["legacy_user_how_site"], ["Interacting through AI"])
+        self.assertEqual(
+            answers["legacy_user_strategy_explanation"],
+            "Previously saved explanation",
+        )
+        self.assertNotIn("user_how_strategy", answers)
+        self.assertFalse(any(x["from_name"].startswith("legacy_") for x in to_ls(migrated, self.data)))
 
     def test_preserve_whitespace_and_reject_duplicate_ids(self):
         data = normalize_conversation(

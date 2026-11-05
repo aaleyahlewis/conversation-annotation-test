@@ -98,10 +98,12 @@ def latest(cid):
 
 def public_record(row):
     sub = latest(row["id"])
+    data = json.loads(row["data"])
+    document = validate_document(json.loads(row["draft"]), data)
     return {
         "id": row["id"],
-        "data": json.loads(row["data"]),
-        "document": json.loads(row["draft"]),
+        "data": data,
+        "document": document,
         "revision": row["revision"],
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],

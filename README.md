@@ -32,7 +32,7 @@ Each person runs their own copy and has their own local data. Publishing code to
 4. Answer the questions for that highlight. Answers save automatically as local drafts. Regions can overlap, and the Regions list can be collapsed.
 5. Use the fixed bottom bar to submit or download data. Required questions are checked on submission. Only questions or sections marked optional can be skipped.
 
-For my-text regions, the Other description is optional. For AI regions, the role selection is optional; the separate role explanation and other answers are required. Conversation-level background is optional.
+For my-text regions, the Other description is optional. For AI regions, the role selection is optional; the separate role explanation and other answers are required. Conversation-level background questions are required.
 
 Try [the manual test guide](docs/SELF_TEST.md) with `fixtures/practice-extension.json`. All bundled example conversations are fictional; they are not participant data or validated annotations. Some original demo labels deliberately differ from source-message roles.
 
